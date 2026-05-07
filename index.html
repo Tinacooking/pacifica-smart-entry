@@ -80,6 +80,46 @@
       </div>
     </section>
 
+    <!-- Live order book -->
+    <section class="max-w-5xl mx-auto px-6 py-16 border-t border-zinc-900">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+        </span>
+        <span class="text-xs uppercase tracking-[0.2em] text-emerald-400/80">Live testnet</span>
+      </div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-2">What the agent sees right now</h2>
+      <p class="text-zinc-500 mb-8">BTC perpetual order book on Pacifica testnet. The agent's <code class="mono text-emerald-400/90 text-sm">read_market()</code> reads exactly this.</p>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-[0.15em] text-zinc-500 mb-2">Best bid</div>
+          <div id="bestBid" class="mono text-2xl font-bold text-emerald-400">—</div>
+          <div id="bidSize" class="mono text-xs text-zinc-500 mt-1">—</div>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-[0.15em] text-zinc-500 mb-2">Best ask</div>
+          <div id="bestAsk" class="mono text-2xl font-bold text-rose-400">—</div>
+          <div id="askSize" class="mono text-xs text-zinc-500 mt-1">—</div>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-[0.15em] text-zinc-500 mb-2">Spread</div>
+          <div id="spread" class="mono text-2xl font-bold text-zinc-200">—</div>
+          <div class="mono text-xs text-zinc-500 mt-1">bps</div>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-[0.15em] text-zinc-500 mb-2">Top-of-book depth</div>
+          <div id="topDepth" class="mono text-2xl font-bold text-zinc-200">—</div>
+          <div class="mono text-xs text-zinc-500 mt-1">USD</div>
+        </div>
+      </div>
+
+      <p class="text-xs text-zinc-500 mt-5 mono">
+        <span class="text-zinc-400">GET</span> test-api.pacifica.fi/api/v1/book?symbol=BTC · refresh 3s · <span id="lastUpdate">connecting…</span>
+      </p>
+    </section>
+
     <!-- TL;DR table -->
     <section class="max-w-5xl mx-auto px-6 py-16 border-t border-zinc-900">
       <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">TL;DR</div>
@@ -231,6 +271,51 @@
         })
         .catch(() => { /* not trusted yet */ });
     }
+
+    // ---- live BTC perpetual order book from Pacifica testnet ----
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n, d = 2) => Number(n).toLocaleString('en-US', {
+      minimumFractionDigits: d,
+      maximumFractionDigits: d,
+    });
+
+    async function loadOrderBook() {
+      try {
+        const r = await fetch(
+          'https://test-api.pacifica.fi/api/v1/book?symbol=BTC',
+          { cache: 'no-store' }
+        );
+        const json = await r.json();
+        if (!json.success) throw new Error('book fetch failed');
+
+        const [bids, asks] = json.data.l;
+        const topBid = bids[0];
+        const topAsk = asks[0];
+
+        const bidPrice  = parseFloat(topBid.p);
+        const askPrice  = parseFloat(topAsk.p);
+        const bidAmount = parseFloat(topBid.a);
+        const askAmount = parseFloat(topAsk.a);
+
+        const mid          = (bidPrice + askPrice) / 2;
+        const spreadBps    = ((askPrice - bidPrice) / mid) * 10_000;
+        const topDepthUsd  = bidAmount * bidPrice;
+
+        $('bestBid').textContent    = '$' + fmt(bidPrice, 0);
+        $('bidSize').textContent    = fmt(bidAmount, 4) + ' BTC';
+        $('bestAsk').textContent    = '$' + fmt(askPrice, 0);
+        $('askSize').textContent    = fmt(askAmount, 4) + ' BTC';
+        $('spread').textContent     = fmt(spreadBps, 1);
+        $('topDepth').textContent   = '$' + fmt(topDepthUsd, 0);
+        $('lastUpdate').textContent = 'updated ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        console.error('order book fetch error:', err);
+        $('lastUpdate').textContent = 'unable to reach testnet';
+      }
+    }
+
+    loadOrderBook();
+    setInterval(loadOrderBook, 3000);
   </script>
 </body>
 </html>

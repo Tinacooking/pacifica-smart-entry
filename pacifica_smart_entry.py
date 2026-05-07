@@ -25,7 +25,7 @@ keypair  = os.environ["PACIFICA_KP"]
 
 client = PacificaClient(base_url=base_url, keypair=keypair)
 
-SYMBOL = "BTC-PERP"
+SYMBOL = "BTC"   # Pacifica perpetual symbol — case-sensitive. Spot is "BTC-USDC".
 
 
 # ---------------------------------------------------------------
