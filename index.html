@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Smarter on Pacifica — Start With Your Order Type</title>
+  <meta name="description" content="An AI agent that picks the right order type on Pacifica based on conviction and book depth. Article + runnable Python script.">
+  <meta property="og:title" content="Trade Smarter on Pacifica — Start With Your Order Type">
+  <meta property="og:description" content="Pacifica gives you seven distinct intentions. Pick the intention first, then place the order.">
+  <meta property="og:type" content="article">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    /* subtle grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle at 20% 0%, rgba(16,185,129,0.06), transparent 50%),
+                        radial-gradient(circle at 100% 100%, rgba(168,85,247,0.05), transparent 50%);
+      pointer-events: none; z-index: 0;
+    }
+    main, footer, header { position: relative; z-index: 1; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
+
+  <!-- Top bar -->
+  <header class="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2 text-zinc-200 font-semibold">
+      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      pacifica-smart-entry
+    </a>
+    <nav class="flex items-center gap-5 text-sm text-zinc-400">
+      <a href="https://github.com/Tinacooking/pacifica-smart-entry" class="hover:text-zinc-100 transition">GitHub</a>
+      <a href="https://x.com/tinacooking" class="hover:text-zinc-100 transition">X</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="max-w-5xl mx-auto px-6 pt-16 pb-20">
+      <div class="text-xs uppercase tracking-[0.2em] text-emerald-400/80 mb-5">Trade smarter on Pacifica</div>
+      <h1 class="text-4xl md:text-6xl font-extrabold leading-[1.05] tracking-tight mb-7">
+        Start with your<br>
+        <span class="text-emerald-400">order type.</span>
+      </h1>
+      <p class="text-zinc-400 text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
+        Most traders use one or two order types by default and never touch the rest.
+        Pacifica gives you seven distinct intentions — punch through, rest at level,
+        snipe, maker-only, top-of-book, arm breakout, capped breakout. Pick the
+        intention first, then place the order.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <button id="connectBtn" class="px-5 py-3 bg-purple-500 hover:bg-purple-400 active:bg-purple-600 text-white rounded-xl font-medium transition flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 128 128" fill="currentColor"><path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64h2.4c15.4 0 31.5-3.4 44.4-12.7 4.4-3.2 8.4-7 11.9-11.5 3.5-4.5 6.5-9.4 8.7-14.7.6-1.5-.9-3-2.4-2.4-5.6 2.3-11.8 3.5-18.2 3.5-21.5 0-39-17.5-39-39 0-19.7 14.6-36 33.6-38.6 1.6-.2 1.7-2.5.1-2.9C99.7.4 87.7 0 75.5 0H64z"/></svg>
+          Connect Phantom
+        </button>
+        <a href="#article" class="px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl font-medium transition">
+          Read the article
+        </a>
+        <a href="https://github.com/Tinacooking/pacifica-smart-entry" target="_blank" class="px-5 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-medium transition">
+          GitHub →
+        </a>
+      </div>
+
+      <div id="walletPanel" class="hidden mt-8 p-5 bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl max-w-xl">
+        <div class="text-xs uppercase tracking-[0.15em] text-zinc-500 mb-2">Connected wallet</div>
+        <div id="walletAddr" class="mono text-sm text-emerald-400 break-all"></div>
+        <div class="text-xs text-zinc-500 mt-3 leading-relaxed">
+          Read-only — this page does not sign transactions or move funds.
+          To actually trade, run the
+          <a href="https://github.com/Tinacooking/pacifica-smart-entry/blob/main/pacifica_smart_entry.py" class="text-zinc-300 underline decoration-dotted hover:decoration-solid">Python agent</a>
+          against Pacifica's testnet.
+        </div>
+      </div>
+    </section>
+
+    <!-- TL;DR table -->
+    <section class="max-w-5xl mx-auto px-6 py-16 border-t border-zinc-900">
+      <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">TL;DR</div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-2">Six intentions, six orders</h2>
+      <p class="text-zinc-500 mb-10">Pick the intention first. The order type follows.</p>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead class="text-xs uppercase tracking-wider text-zinc-500">
+            <tr class="border-b border-zinc-800">
+              <th class="py-3 pr-6 font-medium">Intention</th>
+              <th class="py-3 font-medium">Order</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-200">
+            <tr class="border-b border-zinc-900/70 hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Punching through, decision is made</td><td class="py-4 mono text-sm">Market</td></tr>
+            <tr class="border-b border-zinc-900/70 hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Patient at a level</td><td class="py-4 mono text-sm">Limit + GTC</td></tr>
+            <tr class="border-b border-zinc-900/70 hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Now or never, no resting</td><td class="py-4 mono text-sm">Limit + IOC</td></tr>
+            <tr class="border-b border-zinc-900/70 hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Maker-only, and I want to actually fill</td><td class="py-4 mono text-sm text-emerald-400">Limit + TOB ✦</td></tr>
+            <tr class="border-b border-zinc-900/70 hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Wake me up if I'm wrong</td><td class="py-4 mono text-sm">Stop Market</td></tr>
+            <tr class="hover:bg-zinc-900/30 transition"><td class="py-4 pr-6">Wake me up, but cap the slippage</td><td class="py-4 mono text-sm">Stop Limit</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="text-xs text-zinc-500 mt-6">
+        ✦ TOB is Pacifica-exclusive — post-only orders that reposition instead of getting cancelled when the book moves.
+      </p>
+    </section>
+
+    <!-- Code skeleton -->
+    <section class="max-w-5xl mx-auto px-6 py-16 border-t border-zinc-900">
+      <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">The agent</div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-2">Three functions. One safety rule.</h2>
+      <p class="text-zinc-500 mb-10">~150 lines of Python. Runnable on testnet.</p>
+
+      <pre class="mono text-sm bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl p-5 md:p-6 overflow-x-auto leading-relaxed"><code><span class="text-zinc-500"># 1. Look at the order book</span>
+<span class="text-purple-300">def</span> <span class="text-emerald-300">read_market</span>():
+    <span class="text-zinc-400">"""Mid price + top-of-book depth."""</span>
+    ...
+
+<span class="text-zinc-500"># 2. Choose the order type — three branches, three intentions</span>
+<span class="text-purple-300">def</span> <span class="text-emerald-300">choose_order</span>(side, size_in_usd, conviction, market):
+    <span class="text-purple-300">if</span> conviction &gt; <span class="text-amber-300">0.8</span> <span class="text-purple-300">and</span> size_fits_book:
+        <span class="text-purple-300">return</span> market_order()              <span class="text-zinc-500"># punch through</span>
+    <span class="text-purple-300">if</span> conviction &gt; <span class="text-amber-300">0.5</span>:
+        <span class="text-purple-300">return</span> limit(tif=<span class="text-emerald-300">"TOB"</span>)            <span class="text-zinc-500"># Pacifica exclusive</span>
+    <span class="text-purple-300">return</span> limit(tif=<span class="text-emerald-300">"GTC"</span>)                <span class="text-zinc-500"># patient</span>
+
+<span class="text-zinc-500"># 3. Open the position AND attach a stop, in one call</span>
+<span class="text-purple-300">def</span> <span class="text-emerald-300">safe_open</span>(side, size_in_usd, conviction, stop_pct=<span class="text-amber-300">2.0</span>):
+    market = read_market()
+    order  = choose_order(side, size_in_usd, conviction, market)
+    entry  = place_entry(order)
+    <span class="text-purple-300">if</span> entry.filled:
+        place_stop_market(reduce_only=<span class="text-amber-300">True</span>)  <span class="text-zinc-500"># never optional</span>
+    <span class="text-purple-300">return</span> entry</code></pre>
+
+      <p class="text-zinc-400 mt-7 leading-relaxed">
+        Three branches in the brain. Every entry gets a stop, atomically.
+        That's the whole agent.
+        <a href="https://github.com/Tinacooking/pacifica-smart-entry/blob/main/pacifica_smart_entry.py" class="text-emerald-400 hover:underline ml-1">See the full file →</a>
+      </p>
+    </section>
+
+    <!-- Article CTA -->
+    <section id="article" class="max-w-5xl mx-auto px-6 py-16 border-t border-zinc-900">
+      <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">The article</div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-5 leading-tight">
+        How I vibe-coded an agent on Pacifica<br>
+        <span class="text-zinc-500">and let the order types teach me the market.</span>
+      </h2>
+      <p class="text-zinc-400 max-w-2xl mb-3 leading-relaxed">
+        The four order types. The four TIF settings. The 50–100ms randomized delay
+        and why it makes spreads tighter for everyone. Why TOB is the one Pacifica
+        feature you can't find on other DEXs.
+      </p>
+      <p class="text-zinc-400 max-w-2xl mb-10 leading-relaxed">
+        Built by reading the docs, breaking the testnet, fixing it, and asking the
+        order book to tell me what each tool was for.
+      </p>
+      <a href="https://github.com/Tinacooking/pacifica-smart-entry#readme" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl font-semibold transition">
+        Read the full article on GitHub
+        <span aria-hidden>→</span>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="max-w-5xl mx-auto px-6 py-10 mt-8 border-t border-zinc-900 text-zinc-500 text-sm flex flex-wrap gap-y-3 gap-x-8 justify-between items-center">
+    <div>
+      Built by
+      <a href="https://x.com/tinacooking" class="text-zinc-300 hover:underline">@tinacooking</a>
+      ·
+      <span class="mono text-xs">MIT</span>
+    </div>
+    <div class="flex gap-5">
+      <a href="https://github.com/Tinacooking/pacifica-smart-entry" class="hover:text-zinc-300 transition">GitHub</a>
+      <a href="https://x.com/tinacooking" class="hover:text-zinc-300 transition">X / Twitter</a>
+      <a href="https://pacifica.fi" target="_blank" class="hover:text-zinc-300 transition">Pacifica</a>
+    </div>
+  </footer>
+
+  <script>
+    const connectBtn   = document.getElementById('connectBtn');
+    const walletPanel  = document.getElementById('walletPanel');
+    const walletAddr   = document.getElementById('walletAddr');
+
+    function shortAddr(addr) {
+      return addr.slice(0, 6) + '…' + addr.slice(-4);
+    }
+
+    async function connectPhantom() {
+      const provider = window?.solana;
+      if (!provider || !provider.isPhantom) {
+        window.open('https://phantom.app/download', '_blank');
+        return;
+      }
+      try {
+        const resp = await provider.connect();
+        const addr = resp.publicKey.toString();
+        walletAddr.textContent = addr;
+        walletPanel.classList.remove('hidden');
+        connectBtn.innerHTML =
+          '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>' +
+          '<span class="mono text-sm">' + shortAddr(addr) + '</span>';
+        connectBtn.classList.remove('bg-purple-500', 'hover:bg-purple-400', 'active:bg-purple-600', 'text-white');
+        connectBtn.classList.add('bg-zinc-900', 'border', 'border-zinc-800', 'text-zinc-200');
+      } catch (err) {
+        console.error('Phantom connect cancelled:', err);
+      }
+    }
+
+    connectBtn.addEventListener('click', connectPhantom);
+
+    // auto-restore if already trusted
+    if (window?.solana?.isPhantom) {
+      window.solana.connect({ onlyIfTrusted: true })
+        .then((resp) => {
+          if (resp?.publicKey) {
+            walletAddr.textContent = resp.publicKey.toString();
+            walletPanel.classList.remove('hidden');
+            connectBtn.innerHTML =
+              '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>' +
+              '<span class="mono text-sm">' + shortAddr(resp.publicKey.toString()) + '</span>';
+            connectBtn.classList.remove('bg-purple-500', 'hover:bg-purple-400', 'active:bg-purple-600', 'text-white');
+            connectBtn.classList.add('bg-zinc-900', 'border', 'border-zinc-800', 'text-zinc-200');
+          }
+        })
+        .catch(() => { /* not trusted yet */ });
+    }
+  </script>
+</body>
+</html>
