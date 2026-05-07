@@ -107,22 +107,7 @@ def safe_open(side, size_in_usd, conviction, stop_pct=2.0):
 
 Three functions. Three branches in the brain. One safety rule: **every entry gets a stop, atomically.** That's the whole agent.
 
-To run it yourself, set two environment variables and run the script:
-
-```bash
-export PACIFICA_KP=your_solana_keypair
-export PACIFICA_BASE_URL=https://test-api.pacifica.fi/api/v1   # testnet first
-
-python pacifica_smart_entry.py
-```
-
-The script will open a small long on BTC-PERP, attach a 2% stop loss, and exit. Watch the logs. Inspect what it placed. Try changing `conviction=0.7` to `0.9` and notice that the order type changes — the same script now sends a **market** order instead of a TOB limit, because the agent decided you're confident enough to take the spread.
-
-That is the entire idea of this article in one experiment: **the same intention, expressed through different order types, produces meaningfully different outcomes.**
-
-Once this script has run a few hundred times on the testnet without surprising you, you can change a single environment variable to point at mainnet, and the same code becomes a live trader.
-
-The next four sections explain *why* this script chooses what it chooses. We'll start with the four order types it can produce.
+Same intention, different order type, meaningfully different outcomes. The next four sections explain *why* the agent picks what it picks.
 
 ---
 
