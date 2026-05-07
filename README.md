@@ -55,24 +55,24 @@ The real shape of the problem looks more like this:
 | Wake me up if price crosses X | Stop Market |
 | Wake me up, but cap the slippage | Stop Limit |
 
-Once you see them as **seven distinct intentions** instead of one verb with seven flags, the whole game changes. Whether you're trading by hand or wiring an agent, the work is the same: pick the intention first, then place the order.
+Once you see seven intentions instead of one verb, the work changes. Whether you're trading by hand or wiring a bot, you stop asking *"which order do I place?"* and start asking *"what am I actually trying to do?"*
 
-The model — or your gut — is good at picking *intentions*. Both are bad at picking parameters in a vacuum. Design the action space yourself; let the model choose among them. That single rule is most of what *vibe-coding an AI trader safely* means.
+The order falls out of the answer.
 
 ---
 
 ## How I vibe-coded it
 
-Before I touched any strategy, I needed an environment where I could break things without losing money. Pacifica makes that easy because it runs two endpoints with the **exact same API surface**:
+Before any strategy, I wanted an environment where I could break things without losing money. Pacifica makes this easy: two endpoints, identical in every way except the data behind them.
 
 ```
 testnet   https://test-api.pacifica.fi/api/v1
 mainnet   https://api.pacifica.fi/api/v1
 ```
 
-Same SDK. Same Ed25519 signing on every POST. Same order endpoints. The only thing that changes when you go from "fake money" to "real money" is one string in your config.
+Same SDK. Same auth. Same order endpoints. Same SDK calls. The only thing that changes between "fake money" and "real money" is one string in your config.
 
-So I wrote my entire agent against the testnet first, ran it for a few thousand orders, watched it behave, broke it, fixed it — and only then flipped the URL.
+So I wrote the whole agent against the testnet first. Broke it. Fixed it. Ran a few thousand orders to make sure nothing surprised me. Only then flipped the URL.
 
 The agent does three things, in order:
 
@@ -113,104 +113,75 @@ Same intention, different order type, meaningfully different outcomes. The next 
 
 ## The 4 order types
 
-Every order on Pacifica falls into one of four types. Understanding when to use each one — and why — is the difference between a trader who reacts and a trader who executes with intention.
+Every order on Pacifica is one of four types. Knowing when to reach for each is the difference between a trader who reacts and a trader who executes on purpose.
 
 ### 4.1 Market order
 
-**How it works:** A market order executes immediately against the best available orders sitting in the orderbook. You're not specifying a price — you're taking whatever the book offers right now.
+Executes immediately against whatever's sitting in the book. You don't pick a price — you take the price the book offers right now. On Pacifica, market orders pass through a randomized 50–100ms delay (more on that below).
 
-On Pacifica, market orders are subject to a randomized 50–100ms delay before execution. More on why that's actually a good thing in section 6.
+**Reach for it when:**
 
-**When to use it:**
+- A breakout already happened — waiting for a limit fill means missing the move
+- You need out *now* — the position is going against you fast
+- A major event is coming (FOMC, earnings, liquidation risk) and certainty of exit beats price quality
+- Conviction is high and the trade is worth more than a few ticks of slippage
 
-- **Breakout entries** — price just broke a key level and you need to be in before it runs. Waiting for a limit fill means missing the move entirely.
-- **Emergency exits** — position going against you fast, you need out *now*, regardless of price.
-- **High-conviction momentum plays** — you've made the decision; execution speed matters more than saving a few ticks.
-- **Closing a position before a major event** — earnings, Fed announcement, liquidation risk. Getting out matters more than getting out at a perfect price.
+**The risks** are slippage in thin or volatile books, and market impact when your size is meaningful versus top-of-book depth. Glance at the book before market-buying real size — that one habit saves more money than most strategy upgrades.
 
-**What to watch out for:**
-
-- **Slippage** — the difference between the price you saw and the price you got. In thin markets or during high volatility, this can be significant. On Pacifica, check the orderbook depth before hitting market on a large size.
-- **Market impact** — large market orders eat through multiple price levels. If your size is meaningful relative to the book, you're moving the price against yourself as you fill.
-
-**How other exchanges handle it:** most CEX and DEX platforms offer market orders as standard. The difference is execution quality. On slower DEXs running on-chain matching (dYdX v3, early GMX), a *market order* could mean fills hundreds of milliseconds later at a significantly different price. Pacifica's off-chain matching engine means your market order hits the book at CEX-comparable speed.
-
-> **In the demo:** the first branch of `choose_order` — `is_high_conviction AND fits_in_book`. The size check is the slippage guard; the agent refuses to market-buy when its order would eat more than ~30% of the top of the book.
+> **In the demo:** branch 1 of `choose_order` — high conviction *and* the size fits the book. The size check is the slippage guard.
 
 ### 4.2 Limit order
 
-**How it works:** A limit order only executes at your specified price or better. Buy limit at $64,800 means you'll fill at $64,800 or lower, never higher. Sell limit at $65,200 means you'll fill at $65,200 or higher, never lower.
+Executes at your price or better, never worse. Buy limit at $64,800 fills at $64,800 or below; sell limit at $65,200 fills at $65,200 or above. If price never reaches your level, the order rests on the book — how it rests is controlled by its TIF setting (next section).
 
-If the market never reaches your price, the order sits on the book and waits — based on your TIF setting (covered in section 5).
+**Reach for it when:**
 
-**When to use it:**
+- You've identified a level and want to buy *there*, not chase price higher
+- You're scaling into a position over time
+- You want maker fees instead of taker fees — over volume, this is real P&L
+- The market is range-bound and you're picking off the edges
 
-- **Entering at a specific level** — you've identified support at $64,500 and want to buy *there*, not chase price higher. Set your limit and let the market come to you.
-- **Building a position over time** — dollar-cost averaging into a level, scaling in without chasing. Each limit order fills only when price reaches it.
-- **Reducing fees** — on Pacifica, limit orders that rest on the book fill as **maker** orders, which carry lower fees than taker. For active traders, this adds up significantly over time.
-- **Tight range markets** — when price is consolidating, limit orders let you buy the bottom and sell the top of the range without constantly watching screens.
+**The risks** are partial fills, never filling at all (price wicks past without enough volume on your level), and opportunity cost from being too patient.
 
-**What to watch out for:**
+The biggest Pacifica-specific upside on limit orders is the **TIF layer** — particularly **TOB**, which solves the post-only cancellation problem most DEXs ship with. See section 5.4.
 
-- **Partial fills** — your order might fill in pieces as sellers hit your level. Depending on your TIF setting, the remainder either stays on the book or gets cancelled.
-- **Never filling** — if price touches your level but doesn't have enough volume to fill your full size, you might get a partial or nothing. Especially relevant in fast moves where price wicks to your level and reverses.
-- **Opportunity cost** — being too aggressive with limit placement means missing moves. Price runs to $66,000 while your buy limit sits unfilled at $64,500.
-
-**How other exchanges handle it:** standard across all exchanges. The meaningful difference on Pacifica is the TIF layer — particularly **TOB**, which solves the biggest frustration with limit orders on other DEXs: post-only orders getting cancelled when the book moves. More on this in section 5.4.
-
-> **In the demo:** branches 2 and 3 of `choose_order`. Two limit branches with different intentions — TOB when conviction is medium (be a maker, stay in the queue), GTC when conviction is low (sit at a level and wait). Same primitive, different patience.
+> **In the demo:** branches 2 and 3 of `choose_order`. TOB at medium conviction, GTC at low conviction. Same primitive, different levels of patience.
 
 ### 4.3 Stop Market
 
-**How it works:** a Stop Market is a two-step order — first a trigger condition, then a market order. You set a stop price; when the market hits that level, a market order fires automatically.
+A trigger plus a market order. You set a stop price; when the market hits it, a market order fires automatically. Two directions, two use cases:
 
-Two directions, two use cases:
+- **Below current price** → stop loss. Long at $65,000, stop at $63,500. If price drops there, market sell fires.
+- **Above current price** → breakout entry. Buy stop at $65,600 above resistance — if price breaks out, you're long automatically.
 
-- **Stop below current price (stop loss):** you're long BTC at $65,000, stop set at $63,500. If price drops to $63,500, a market sell fires automatically. Limits your loss without requiring you to watch the screen.
-- **Stop above current price (breakout entry):** price is consolidating at $64,000, resistance at $65,500. Set a buy stop at $65,600 — if price breaks out, you're in automatically without timing the entry manually.
+**Reach for it when:**
 
-**When to use it:**
+- You have an open leveraged position. Always. Every leveraged position should have a stop.
+- You want to enter a breakout on confirmation, not anticipation
+- You need automation across time zones — BTC moves at 3am, you're asleep, the stop handles it
 
-- **Protecting open positions** — the core use case. Every leveraged position on Pacifica should have a stop. Period.
-- **Automated breakout entries** — you've identified a level where you want to be long if price confirms. Stop Market above resistance gets you in on confirmation, not anticipation.
-- **Take-profit automation** — lock in gains at a target level without watching screens. Set a sell stop above current price; go live your life.
-- **Managing positions across time zones** — Pacifica runs 24/7. You're in Vietnam and BTC is making moves at 3am. Stop orders handle your risk while you sleep.
+**The risks** are stop slippage (still a market order on trigger), whipsaws (stopped at the low, then reversal), and gap risk when liquidations cascade clean past your level.
 
-**What to watch out for:**
-
-- **Slippage on trigger** — once triggered, it's a market order. In fast markets or during news events, the actual fill can be significantly worse than your stop price. This is *stop slippage* and it's a real risk on every venue.
-- **Whipsaws** — price hits your stop, triggers the market sell, then immediately reverses higher. Painful, but unavoidable if you're using stops correctly. The alternative is holding through a real breakdown.
-- **Gap risk** — if price gaps past your stop level (common during liquidation cascades or major news), your stop triggers into a market with no liquidity. Fill could be far worse than stop price.
-
-**How other exchanges handle it:** available on all major CEX and most DEX platforms. On-chain DEXs like GMX handle stops differently — they're oracle-based and settle at oracle price rather than orderbook price, which changes the slippage dynamic. Pacifica's off-chain matching means Stop Market orders behave closer to CEX — trigger fires and hits a live orderbook.
-
-> **In the demo:** the last block of `safe_open`. Notice two things: (1) the stop is placed in the **same function** as the entry — never `safe_open()` then *I'll add a stop later.* Same call. (2) `reduce_only=True`. Forget that flag once and your stop fires after you've manually closed, opening a fresh opposite naked position you didn't ask for.
+> **In the demo:** the stop block of `safe_open`. Two things to notice — (1) the stop is placed in the *same call* as the entry, never *"I'll add it later"*, and (2) `reduce_only=True` so the stop can only close, never open a new naked position by accident.
 
 ### 4.4 Stop Limit
 
-**How it works:** same trigger mechanic as Stop Market, but instead of firing a *market* order, it fires a *limit* order. You set two prices:
+Same trigger as Stop Market, but it fires a *limit* order instead of a market. You set two prices:
 
-- **Trigger price** — when the market hits this, the limit order activates
-- **Limit price** — the worst price you'll accept for the fill
+- **Trigger** — when to activate
+- **Limit** — the worst fill you'll accept
 
-Example: BTC at $65,000. You set a stop limit with trigger at $63,500 and limit at $63,200. When price hits $63,500, a sell limit at $63,200 is placed. You'll fill anywhere between $63,500 and $63,200 — but never below $63,200.
+Trigger at $63,500, limit at $63,200 → when price touches $63,500, a sell limit is placed at $63,200. You fill anywhere between, but never below $63,200.
 
-**When to use it:**
+**Reach for it when:**
 
-- **When you'd rather not fill than fill badly** — some traders prefer no fill to a catastrophic fill. Stop Limit gives you that control. If the market is in freefall and gaps past your limit, you stay in the position rather than selling at a terrible price.
-- **Volatile assets with wide spreads** — on altcoin markets with thin liquidity, Stop Market can result in extreme slippage. Stop Limit caps your downside on the fill price.
-- **Breakout entries with price control** — want to enter on a breakout but only if price doesn't run too far? Trigger at $65,500, limit at $65,800. You're in on the break but not chasing if it gaps up aggressively.
-- **Precise risk management** — when your position sizing math depends on a specific entry price, Stop Limit ensures you don't fill at a price that breaks your risk/reward calculation.
+- You'd rather *not fill* than fill catastrophically — e.g., a gap-down clean past your level
+- The asset is thin or volatile and Stop Market would slip too far
+- You're entering a breakout but won't chase if it gaps too aggressively past your level
 
-**What to watch out for:**
+**The risk** is the tradeoff itself — price control costs you execution certainty. In a fast breakdown, price can gap clean through your limit and leave you holding a losing position with no stop filled. Don't treat Stop Limit as a guaranteed stop loss.
 
-- **The fundamental tradeoff** — Stop Limit gives you price control but removes the *guarantee of execution*. In a fast breakdown, price can gap through your limit entirely and leave you holding a losing position with no stop filled. This is the core risk and why many traders prefer Stop Market for actual stop losses.
-- **Setting the limit too tight** — if your trigger and limit are very close together ($63,500 trigger, $63,490 limit), any normal spread will prevent your fill. Give the limit enough room to actually execute.
-- **Not a guaranteed exit** — never treat Stop Limit as a guaranteed stop loss. For hard stops where execution certainty matters, Stop Market is safer.
-
-**How other exchanges handle it:** standard on CEX. Less common on DEX — many DEX platforms only offer Stop Market. Pacifica offering both gives traders the full toolkit that CEX users take for granted.
-
-> **In the demo:** swap one line. Replace `place_stop_market(...)` with `place_stop_limit(..., limit_price=stop_price * 0.995)` and the agent now caps its exit fill price. Use this on thin-book altcoins; keep Stop Market on BTC/ETH.
+> **In the demo:** swap one line. Replace `place_stop_market(...)` with `place_stop_limit(..., limit_price=stop_price * 0.995)` and you've capped your exit fill. Use it on thin-book altcoins; keep Stop Market on BTC/ETH.
 
 ---
 
@@ -281,23 +252,23 @@ If you only remember one Pacifica-specific feature from this whole article, reme
 
 ## The 50–100ms delay — by design
 
-Market orders, GTC, and IOC orders on Pacifica are subject to a randomized 50–100ms delay before execution.
+Market orders, GTC, and IOC orders on Pacifica are subject to a randomized 50–100ms delay before execution. Most retail traders never notice it. Some HFT traders complain about it. Both groups are missing the point.
 
-Most retail traders never notice it. Some HFT traders complain about it. Both groups are missing the point.
+Picture this: you're quoting BTC at $65,000 on the bid. The real price moves to $65,100. For 50 milliseconds, your bid is stale — saying *"I'll buy at $65,000"* when the market just decided BTC is worth $100 more.
 
-**Why it exists:** in financial markets, there's a well-documented problem called **adverse selection**. Sophisticated actors with faster data connections — or any latency advantage — can identify when a market maker's resting orders are mispriced (because the real price has moved but the maker's quote hasn't updated yet) and fill those stale orders before the maker can react.
+A bot watching another exchange spots the gap. Hits your bid. You just bought $100 below market. Multiply by 10,000 quotes a day.
 
-The result: makers consistently get picked off. They provide liquidity, but they systematically fill at bad prices because faster actors exploit the delay between price movement and quote update. Over time, this discourages market making, reduces liquidity depth, and widens spreads for everyone.
+This is **adverse selection**, and it's why most makers eventually quit. Spreads widen. Books thin out. Everyone loses.
 
-The 50–100ms randomized delay breaks this dynamic. By randomizing execution timing, Pacifica removes the advantage of being microseconds faster. **No actor can reliably exploit a speed advantage when execution time is randomized within that window.**
+Pacifica's randomized delay breaks this. By scrambling execution timing within a 50–100ms window, no bot can reliably beat your quote update — even with a faster connection. The race stops being worth running.
 
 **What this means for you:**
 
-- **Maker (using ALO/TOB):** the delay protects your resting orders from being systematically picked off by faster actors. Deeper liquidity benefits you directly through tighter spreads.
-- **Taker (using Market/GTC/IOC):** you experience a slight delay, but you benefit from the tighter spreads that the liquidity protection creates. Net effect is positive.
-- **HFT latency arb:** this delay is intentional. Pacifica is not designed to be a latency arbitrage venue.
+- **Maker (ALO/TOB):** the delay protects your resting orders. You get deeper liquidity and tighter spreads as a direct result.
+- **Taker (Market/GTC/IOC):** you eat 50ms of delay. You also benefit from the tighter spreads that protection creates. Net positive.
+- **HFT latency arb:** the delay is intentional. Pacifica is not designed to be a latency arbitrage venue.
 
-The 50–100ms delay is one of the more sophisticated design decisions in Pacifica's architecture. It's the kind of thing serious market structure engineers build in deliberately — and that most retail traders never think about until they start asking why spreads are tighter here than on other DEXs.
+It's the kind of thing serious market-structure engineers build in deliberately — and that most retail traders never notice until they ask why spreads are tighter here than on other DEXs.
 
 ---
 
