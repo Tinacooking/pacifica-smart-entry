@@ -129,6 +129,13 @@ Executes immediately against whatever's sitting in the book. You don't pick a pr
 **The risks** are slippage in thin or volatile books, and market impact when your size is meaningful versus top-of-book depth. Glance at the book before market-buying real size — that one habit saves more money than most strategy upgrades.
 
 > **In the demo:** branch 1 of `choose_order` — high conviction *and* the size fits the book. The size check is the slippage guard.
+>
+> ```
+> $ python pacifica_smart_entry.py --conviction 0.9
+>
+>   → MARKET BUY 0.001242 BTC
+>     max slippage:  0.3%
+> ```
 
 ### 4.2 Limit order
 
@@ -146,6 +153,18 @@ Executes at your price or better, never worse. Buy limit at $64,800 fills at $64
 The biggest Pacifica-specific upside on limit orders is the **TIF layer** — particularly **TOB**, which solves the post-only cancellation problem most DEXs ship with. See section 5.4.
 
 > **In the demo:** branches 2 and 3 of `choose_order`. TOB at medium conviction, GTC at low conviction. Same primitive, different levels of patience.
+>
+> ```
+> $ python pacifica_smart_entry.py --conviction 0.7
+>   → LIMIT BUY 0.001242 BTC
+>     price:         $80,466.95
+>     TIF:           TOB
+>
+> $ python pacifica_smart_entry.py --conviction 0.3
+>   → LIMIT BUY 0.001242 BTC
+>     price:         $80,144.76
+>     TIF:           GTC
+> ```
 
 ### 4.3 Stop Market
 
@@ -163,6 +182,13 @@ A trigger plus a market order. You set a stop price; when the market hits it, a 
 **The risks** are stop slippage (still a market order on trigger), whipsaws (stopped at the low, then reversal), and gap risk when liquidations cascade clean past your level.
 
 > **In the demo:** the stop block of `safe_open`. Two things to notice — (1) the stop is placed in the *same call* as the entry, never *"I'll add it later"*, and (2) `reduce_only=True` so the stop can only close, never open a new naked position by accident.
+>
+> ```
+>   Stop attached
+>   → STOP_MARKET SELL 0.001242 BTC
+>     trigger:       $78,857.61
+>     reduce_only:   True
+> ```
 
 ### 4.4 Stop Limit
 
@@ -202,6 +228,13 @@ The default. Order rests on the book indefinitely — across sessions, across da
 **The risk** is the 50–100ms randomized delay applies (along with market and IOC). Matters for HFT, irrelevant for swing trading.
 
 > **In the demo:** branch 3 of `choose_order` — low conviction, GTC bid 0.5% below mid. The agent says *I'm not sure, but if price comes back to my level, I want to be there.*
+>
+> ```
+> $ python pacifica_smart_entry.py --conviction 0.3
+>   → LIMIT BUY 0.001242 BTC
+>     price:         $80,144.76
+>     TIF:           GTC
+> ```
 
 ### 5.2 IOC — Immediate or Cancel
 
@@ -243,6 +276,13 @@ You stay maker. You stay in the queue. No cancellation, no manual repricing, no 
 > *[image — split panel: left "ALO on other DEXs" with a ghost order stamped CANCELLED. Right "TOB on Pacifica" with the order repositioned to best bid + 1.]*
 
 > **In the demo:** branch 2 of `choose_order`. The single most important line in the file. Change `tif="TOB"` to `tif="ALO"` and ~30% of those orders get cancelled silently on a fast tape. With TOB, they reprice and stay maker. One flag, materially different fill rate.
+>
+> ```
+> $ python pacifica_smart_entry.py --conviction 0.7
+>   → LIMIT BUY 0.001242 BTC
+>     price:         $80,466.95
+>     TIF:           TOB
+> ```
 
 If you only remember one Pacifica-specific feature from this whole article, remember this one.
 
