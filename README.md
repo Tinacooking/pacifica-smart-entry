@@ -291,15 +291,46 @@ Pacifica gives you the full vocabulary. The script in this repo is how I taught 
 
 ## Run it yourself
 
+The script is a **dry-run**: it reads the live order book from Pacifica's public REST API, decides what order it would place, and prints the decision. No keypair, no signing, no orders go out. Stdlib only — no `pip install` required.
+
 ```bash
 git clone https://github.com/Tinacooking/pacifica-smart-entry.git
 cd pacifica-smart-entry
-pip install pacifica-sdk
 
-export PACIFICA_KP=your_solana_keypair
-export PACIFICA_BASE_URL=https://test-api.pacifica.fi/api/v1   # testnet first
-
-python pacifica_smart_entry.py
+python pacifica_smart_entry.py                     # default: buy, $100, conviction 0.7
+python pacifica_smart_entry.py --conviction 0.9    # high conviction → MARKET
+python pacifica_smart_entry.py --conviction 0.3    # low conviction  → GTC limit
+python pacifica_smart_entry.py --side sell --size 250 --conviction 0.6
 ```
+
+Sample output at `--conviction 0.9` (high enough to trigger the market branch):
+
+```
+────────────────────────────────────────────────────────────
+  Pacifica BTC-PERP — what the agent sees
+  https://test-api.pacifica.fi/api/v1
+────────────────────────────────────────────────────────────
+  best bid:     $   80,315.00
+  best ask:     $   80,346.00
+  mid:          $   80,330.50
+  top depth:    $      10,000
+
+────────────────────────────────────────────────────────────
+  Decision
+────────────────────────────────────────────────────────────
+  → MARKET BUY 0.001245 BTC
+    max slippage:  0.3%
+
+  Stop attached
+  → STOP_MARKET SELL 0.001245 BTC
+    trigger:       $78,739.08
+    reduce_only:   True
+
+  (dry-run — no orders were sent.)
+```
+
+Change `--conviction` and watch the order type flip. That's the whole point: same intention, different order, meaningfully different outcome.
+
+To go live, swap the read-only HTTP layer for Ed25519-signed POSTs against `/create_market_order`, `/create_limit_order`, `/create_stop_order`. Use mainnet URL via `PACIFICA_BASE_URL=https://api.pacifica.fi/api/v1` only after testnet looks clean for at least a few hundred runs.
 
 Code: [`pacifica_smart_entry.py`](./pacifica_smart_entry.py) · License: MIT
