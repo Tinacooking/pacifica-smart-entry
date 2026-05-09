@@ -187,64 +187,62 @@ Trigger at $63,500, limit at $63,200 → when price touches $63,500, a sell limi
 
 ## How to control your limit order — TIF settings
 
-Time-In-Force settings apply to limit orders and determine what happens when an order doesn't fill immediately. Four options on Pacifica, each with a distinct use case.
+Time-In-Force decides what happens when a limit order doesn't fill right away. Four options on Pacifica, each with a distinct use.
 
 ### 5.1 GTC — Good Till Cancelled
 
-**How it works:** order stays on the book indefinitely — across sessions, across days — until it fills completely or you cancel it manually. The default setting.
+The default. Order rests on the book indefinitely — across sessions, across days — until it fills or you cancel it manually.
 
-**When to use it:**
+**Reach for it when:**
 
-- **Swing-trade entries** — you've identified a weekly support level and want to buy there whenever price arrives, even if that's three days from now.
-- **Resting orders at key levels** — set your bid at a significant technical level and forget it. If price comes back, you're in.
-- **Patient position building** — no urgency, willing to wait for your price.
+- You've found a weekly support level and want to buy there whenever price arrives, even if that's three days away
+- You're resting an order at a significant technical level and willing to forget it
+- You're building a position with no urgency
 
-**What to watch out for:** GTC orders on Pacifica (along with market and IOC) are subject to the 50–100ms randomized delay. This matters for high-frequency strategies but is irrelevant for swing traders.
+**The risk** is the 50–100ms randomized delay applies (along with market and IOC). Matters for HFT, irrelevant for swing trading.
 
-> **In the demo:** the third branch of `choose_order` — low conviction, drop a GTC bid 0.5% below mid. The agent expresses *I'm not sure, but if price comes back to my level, I want to be there.*
+> **In the demo:** branch 3 of `choose_order` — low conviction, GTC bid 0.5% below mid. The agent says *I'm not sure, but if price comes back to my level, I want to be there.*
 
 ### 5.2 IOC — Immediate or Cancel
 
-**How it works:** attempts to fill immediately at your specified price or better. Any portion that can't fill right now is cancelled — not rested, not queued. The unfilled portion simply disappears.
+Fills immediately at your price or better. Whatever can't fill right now is cancelled — not rested, not queued. The unfilled portion just disappears.
 
-**When to use it:**
+**Reach for it when:**
 
-- **Large orders where partial fill is acceptable** — you want to buy 10 BTC at $65,000. IOC fills whatever is available at that price right now and cancels the rest. You don't end up with a resting order sitting exposed.
-- **Algorithmic strategies** — algo traders use IOC to avoid leaving footprint on the book. Each attempt fills what it can and leaves no trace.
-- **Time-sensitive entries** — you want to enter at a specific price right now or not at all. If the level isn't there immediately, you don't want the order lingering.
+- You want a large order where a partial fill is fine — IOC takes what's there and walks away, no resting tail exposed
+- You're running an algo and don't want to leave footprint on the book
+- You want this price right now or not at all
 
-**The difference from GTC:** GTC is patient. IOC is *immediate or nothing*.
+GTC is patient. IOC is *now or nothing*.
 
-> **In the demo:** not used by the default agent — but it's a one-line swap from `tif="GTC"` to `tif="IOC"` if you want sweeping behavior instead of resting behavior.
+> **In the demo:** not used by default — but a one-line swap from `tif="GTC"` to `tif="IOC"` switches the agent from patient to sweeping.
 
 ### 5.3 ALO — Add Liquidity Only (Post Only)
 
-**How it works:** the order is only placed if it would NOT immediately match against an existing order. If placing it would result in an immediate fill (making you a taker), it's cancelled instead.
+The order is placed only if it would NOT immediately match an existing order. If placing it would make you a taker, it's cancelled instead. You're always the maker, always adding liquidity.
 
-This guarantees you're always the maker — you're adding liquidity to the book, not taking it.
+**Reach for it when:**
 
-**When to use it:**
+- You want maker fees, not taker fees — over volume, this is real P&L
+- You're running a market-making strategy where maker fees are the whole edge
+- You want to enter without moving the price
 
-- **Reducing fees** — on Pacifica, makers pay lower fees than takers. For active traders running significant volume, consistently paying maker instead of taker fees is meaningful P&L.
-- **Market-making strategies** — professional market makers live and die by maker fees. ALO is the standard tool.
-- **Entering without market impact** — your order rests passively until someone fills against it.
+**The pain on most platforms:** if the book moves into your ALO order — even by a single tick — it crosses and gets cancelled. You reprice. By the time you reprice, the level moved again. Place, cancel, place, cancel.
 
-**The frustration on most platforms:** if you place an ALO order and the market moves toward it before it rests — even by a single tick — it crosses the book and gets cancelled. You have to reprice manually and resubmit. In fast markets, by the time you reprice, the level has moved again. This is the core pain point of post-only trading on most DEXs.
-
-Pacifica solves this with TOB.
+Pacifica fixes this with TOB.
 
 ### 5.4 TOB — Top of Book ✦ (Pacifica exclusive)
 
-**How it works:** TOB is ALO with one critical upgrade: if the order would cross the book, instead of being cancelled, it automatically repositions to the best available price.
+TOB is ALO with one critical upgrade: if the order would cross the book, instead of cancelling, it **automatically repositions** to the best available price on your side.
 
-- If your buy order would cross → repositioned to highest bid in the book plus one tick
-- If your sell order would cross → repositioned to lowest ask in the book minus one tick
+- Buy that would cross → moved to highest bid + 1 tick
+- Sell that would cross → moved to lowest ask − 1 tick
 
-You stay on the right side of the spread. You stay maker. **No cancellation, no manual repricing, no missed entry.**
+You stay maker. You stay in the queue. No cancellation, no manual repricing, no missed entry.
 
 > *[image — split panel: left "ALO on other DEXs" with a ghost order stamped CANCELLED. Right "TOB on Pacifica" with the order repositioned to best bid + 1.]*
 
-> **In the demo:** the second branch of `choose_order`. This is the single most important line in the file. Change `tif="TOB"` to `tif="ALO"` and on a fast tape, ~30% of those orders get cancelled silently. With TOB, they reprice and stay maker. One flag, materially different fill rate.
+> **In the demo:** branch 2 of `choose_order`. The single most important line in the file. Change `tif="TOB"` to `tif="ALO"` and ~30% of those orders get cancelled silently on a fast tape. With TOB, they reprice and stay maker. One flag, materially different fill rate.
 
 If you only remember one Pacifica-specific feature from this whole article, remember this one.
 
