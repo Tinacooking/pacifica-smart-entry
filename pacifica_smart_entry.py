@@ -138,7 +138,8 @@ def choose_order(side, size_in_usd, conviction, market):
 # live, swap http_get for an Ed25519-signed http_post against
 # /create_market_order, /create_limit_order, /create_stop_order.
 
-def safe_open(side, size_in_usd, conviction, stop_distance_percent=2.0):
+def safe_open(side, size_in_usd, conviction, stop_distance_percent=2.0,
+              stop_style="market"):
     market = read_market()
     order  = choose_order(side, size_in_usd, conviction, market)
 
@@ -156,17 +157,28 @@ def safe_open(side, size_in_usd, conviction, stop_distance_percent=2.0):
         stop_price = projected_fill * (1 + stop_pct)
         stop_side  = "buy"
 
-    return {
-        "market": market,
-        "entry":  order,
-        "stop": {
-            "type":          "stop_market",
-            "side":          stop_side,
-            "trigger_price": stop_price,
-            "amount":        order["quantity"],
-            "reduce_only":   True,
-        },
+    stop = {
+        "side":          stop_side,
+        "trigger_price": stop_price,
+        "amount":        order["quantity"],
+        "reduce_only":   True,
     }
+
+    if stop_style == "limit":
+        # Cap the worst fill 0.5% past the trigger. In a freefall, the
+        # exit will not fill below this — at the cost of execution
+        # certainty (you can be left holding the position if the book
+        # gaps clean through the limit).
+        limit_buffer = 0.005
+        if side == "buy":
+            stop["limit_price"] = stop_price * (1 - limit_buffer)
+        else:
+            stop["limit_price"] = stop_price * (1 + limit_buffer)
+        stop["type"] = "stop_limit"
+    else:
+        stop["type"] = "stop_market"
+
+    return {"market": market, "entry": order, "stop": stop}
 
 
 # ---------------------------------------------------------------
@@ -201,9 +213,15 @@ def render(decision):
         print(f"    TIF:           {entry['tif']}")
     print()
     print(f"  Stop attached")
-    print(f"  → STOP_MARKET {stop['side'].upper()} {stop['amount']:.6f} {SYMBOL}")
-    print(f"    trigger:       ${stop['trigger_price']:,.2f}")
-    print(f"    reduce_only:   {stop['reduce_only']}")
+    if stop["type"] == "stop_limit":
+        print(f"  → STOP_LIMIT {stop['side'].upper()} {stop['amount']:.6f} {SYMBOL}")
+        print(f"    trigger:       ${stop['trigger_price']:,.2f}")
+        print(f"    limit_price:   ${stop['limit_price']:,.2f}")
+        print(f"    reduce_only:   {stop['reduce_only']}")
+    else:
+        print(f"  → STOP_MARKET {stop['side'].upper()} {stop['amount']:.6f} {SYMBOL}")
+        print(f"    trigger:       ${stop['trigger_price']:,.2f}")
+        print(f"    reduce_only:   {stop['reduce_only']}")
     print()
     print("  (dry-run — no orders were sent.)")
     print(line)
@@ -222,6 +240,8 @@ def main():
                    help="strategy conviction 0.0–1.0 (default: 0.7)")
     p.add_argument("--stop-pct", type=float, default=2.0,
                    help="stop loss distance in percent (default: 2.0)")
+    p.add_argument("--stop-style", choices=["market", "limit"], default="market",
+                   help="stop order style: 'market' (default) or 'limit' to cap the exit fill")
     args = p.parse_args()
 
     decision = safe_open(
@@ -229,6 +249,7 @@ def main():
         size_in_usd=args.size,
         conviction=args.conviction,
         stop_distance_percent=args.stop_pct,
+        stop_style=args.stop_style,
     )
     render(decision)
 

@@ -207,7 +207,17 @@ Trigger at $63,500, limit at $63,200 → when price touches $63,500, a sell limi
 
 **The risk** is the tradeoff itself — price control costs you execution certainty. In a fast breakdown, price can gap clean through your limit and leave you holding a losing position with no stop filled. Don't treat Stop Limit as a guaranteed stop loss.
 
-> **In the demo:** swap one line. Replace `place_stop_market(...)` with `place_stop_limit(..., limit_price=stop_price * 0.995)` and you've capped your exit fill. Use it on thin-book altcoins; keep Stop Market on BTC/ETH.
+> **In the demo:** pass `--stop-style limit` to the script. The stop block flips from a Stop Market to a Stop Limit, capping the exit fill 0.5% past the trigger. Use it on thin-book altcoins; keep Stop Market on BTC/ETH.
+>
+> ```
+> $ python pacifica_smart_entry.py --conviction 0.9 --stop-style limit
+>
+>   Stop attached
+>   → STOP_LIMIT SELL 0.001243 BTC
+>     trigger:       $78,856.68
+>     limit_price:   $78,462.40
+>     reduce_only:   True
+> ```
 
 ---
 
@@ -335,9 +345,10 @@ The script is a **dry-run**: it reads the live order book from Pacifica's public
 git clone https://github.com/Tinacooking/pacifica-smart-entry.git
 cd pacifica-smart-entry
 
-python pacifica_smart_entry.py                     # default: buy, $100, conviction 0.7
-python pacifica_smart_entry.py --conviction 0.9    # high conviction → MARKET
-python pacifica_smart_entry.py --conviction 0.3    # low conviction  → GTC limit
+python pacifica_smart_entry.py                                     # default: buy, $100, conviction 0.7
+python pacifica_smart_entry.py --conviction 0.9                    # high conviction → MARKET
+python pacifica_smart_entry.py --conviction 0.3                    # low conviction  → GTC limit
+python pacifica_smart_entry.py --conviction 0.9 --stop-style limit # cap the stop fill price
 python pacifica_smart_entry.py --side sell --size 250 --conviction 0.6
 ```
 
